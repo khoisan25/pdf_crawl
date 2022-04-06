@@ -34,7 +34,7 @@ class Crawler:
         self.start_time = time.time()
         self.download_count = 0
         self.download_size = 0
-        self.logger = Logger(__file__)
+        self.logger = Logger(inspect.stack()[1][1])
         self.logger.log('Crawler started')
         self.logger.log('Crawling ' + self.url)
         self.logger.log('Crawling ' + self.url + ' with the following parameters ' + '\n' + '\t' + 'max_download_size: ' + self.max_download_size + '\n' + '\t' + 'file_extension: ' + self.file_extension + '\n' + '\t' + 'config_name: ' + self.config_name + '\n' + '\t' + 'output_dir: ' + self.output_dir + '\n' + '\t' + 'depth: ' + self.crawler_depth + '\n' + '\t' + 'method: ' + self.crawler_method + '\n' + '\t' + 'threads: ' + self.crawler_threads + '\n' + '\t' + 'timeout: ' + self.crawler_timeout)
@@ -116,6 +116,12 @@ class Crawler:
             self.logger.log('Crawler error: ' + str(e))
     def download_file(self, url):
         try:
+            if self.utils.file_exists(url):
+                self.logger.log('File ' + url + ' already downloaded')
+                return
+            if self.utils.file_size(url) > self.max_download_size:
+                self.logger.log('File ' + url + ' is too large')
+                return
             request = urllib2.Request(url)
             #TODO use settings to set user agent
             response = urllib2.urlopen(request)
