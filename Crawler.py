@@ -3,6 +3,9 @@ import os
 import time
 import threading
 import queue
+import inspect
+import path
+import logging
 
 from bs4 import BeautifulSoup
 from selenium import webdriver
@@ -12,6 +15,16 @@ class Crawler:
         self.settings = Settings()
         #TODO unpack settings here.
         # crawler method, download params, extensions etc. make them class variables. Or just use settings.
+        # fixed!. Deicded to use teh class variable aproach.
+        self.url = self.settings.config.get('default', 'crawler', 'url')
+        self.max_download_size = self.settings.config.get('default', 'crawler', 'max_download_size')
+        self.file_extension = self.settings.config.get('default', 'crawler', 'file_extension')
+        self.config_name = self.settings.config.get('default', 'crawler', 'config_name')
+        self.output_dir = self.settings.config.get('default', 'crawler', 'output_dir')
+        self.crawler_depth = self.settings.config.get('default', 'crawler', 'depth')
+        self.crawler_method = self.settings.config.get('default', 'crawler', 'method')
+        self.crawler_threads = self.settings.config.get('default', 'crawler', 'threads')
+        self.crawler_timeout = self.settings.config.get('default', 'crawler', 'timeout')
         self.utils = Utils()
         self.handler = Handler()
         self.queue = queue.Queue()
@@ -21,7 +34,7 @@ class Crawler:
         self.start_time = time.time()
         self.download_count = 0
         self.download_size = 0
-        self.logger = Logger()
+        self.logger = Logger(__file__)
         self.logger.log('Crawler started')
         self.logger.log('Crawling ' + self.url)
         self.logger.log('Crawling ' + self.url + ' with the following parameters ' + '\n' + '\t' + 'max_download_size: ' + self.max_download_size + '\n' + '\t' + 'file_extension: ' + self.file_extension + '\n' + '\t' + 'config_name: ' + self.config_name + '\n' + '\t' + 'output_dir: ' + self.output_dir + '\n' + '\t' + 'depth: ' + self.crawler_depth + '\n' + '\t' + 'method: ' + self.crawler_method + '\n' + '\t' + 'threads: ' + self.crawler_threads + '\n' + '\t' + 'timeout: ' + self.crawler_timeout)
@@ -59,6 +72,21 @@ class Crawler:
         # Can we do both at once?, multi-loops slow.
         #TODO 1. iter output and append hyperlinks
         #TODO 2. iter output and download files
+        # Update 06.04.2022 | Needs testing.
+        for link in soup.find_all('a'):
+            href = link.get('href')
+            if href is not None:
+                if href.startswith('http'):
+                    self.queue.put((href, depth - 1))
+                else:
+                    self.queue.put((urlparse.urljoin(url, href), depth - 1))
+        for link in soup.find_all(self.file_extension):
+            href = link.get('href')
+            if href is not None:
+                if href.startswith('http'):
+                    self.download_file(href)
+                else:
+                    self.download_file(urlparse.urljoin(url, href))
     def crawl_url_urllib2(self, url, depth):
         try:
             request = urllib2.Request(url)
@@ -69,6 +97,21 @@ class Crawler:
             # Can we do both at once?, multi-loops slow.
             #TODO 1. iter output and append hyperlinks
             #TODO 2. iter output and download files
+            # Update. Look above
+            for link in soup.find_all('a'):
+                href = link.get('href')
+                if href is not None:
+                    if href.startswith('http'):
+                        self.queue.put((href, depth - 1))
+                    else:
+                        self.queue.put((urlparse.urljoin(url, href), depth - 1))
+            for link in soup.find_all(self.file_extension):
+                href = link.get('href')
+                if href is not None:
+                    if href.startswith('http'):
+                        self.download_file(href)
+                    else:
+                        self.download_file(urlparse.urljoin(url, href))
         except Exception as e:
             self.logger.log('Crawler error: ' + str(e))
     def download_file(self, url):
